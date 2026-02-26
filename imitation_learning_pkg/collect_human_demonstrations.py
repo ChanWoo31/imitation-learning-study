@@ -42,6 +42,11 @@ def collect_human_trajectory(env, device, arm, max_fr, goal_update_mode):
     """
 
     env.reset()
+
+    # # 초기 조인트 값 설정
+    # master_joint = device.get_current_q()
+    # env.robots[0].set_robot_joint_positions(master_joint)
+
     env.render()
 
     task_completion_hold_count = -1  # counter to collect 10 timesteps after reaching goal
@@ -247,7 +252,7 @@ if __name__ == "__main__":
         "--camera",
         nargs="*",
         type=str,
-        default="agentview",
+        default="frontview",
         help="List of camera names to use for collecting demos. Pass multiple names to enable multiple views. Note: the `mujoco` renderer must be enabled when using multiple views; `mjviewer` is not supported.",
     )
     parser.add_argument(
@@ -303,6 +308,9 @@ if __name__ == "__main__":
         controller=args.controller,
         robot=args.robots[0],
     )
+
+    # 절대좌표로 하도록 추가
+    # controller_config["input_type"] = "absolute"
 
     if controller_config["type"] == "WHOLE_BODY_MINK_IK":
         # mink-speicific import. requires installing mink
