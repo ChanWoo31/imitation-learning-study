@@ -31,6 +31,9 @@ class DynamixelMasterDevice(Device):
         self.pos_sensitivity = pos_sensitivity
         self.rot_sensitivity = rot_sensitivity
 
+        self.base_modes = ["0"] * len(self.env.robots)
+        self.active_robot = 0
+
         self._reset_state = 0
         self._enabled = False
 
@@ -86,9 +89,18 @@ class DynamixelMasterDevice(Device):
 
         self._control = [0, 0, 0, 0, 0, 0]
         self._reset_state = 0
-        self.rotation = np.array([[-1, 0, 0],
-                                  [0, 1, 0],
-                                  [0, 0, -1]])
+        # self.rotation = np.array([[-1, 0, 0],
+        #                           [0, 1, 0],
+        #                           [0, 0, -1]])
+        self.rotation = np.eye(3)
+        self.last_pos = None
+        self.last_ori = None
+
+        self.q = np.zeros(6)
+        self.current_q = np.zeros(6)
+
+        # 절대로 시도
+        self.abs_offset = None
         
     def trans_mat(self, theta, d, a, alpha):
         T = np.array([
@@ -109,17 +121,19 @@ class DynamixelMasterDevice(Device):
     def _reset_internal_state(self):
         super()._reset_internal_state()
         
-        self.rotation = np.array(
-            [[-1.0, 0.0, 0.0],
-             [0.0, 1.0, 0.0],
-             [0.0, 0.0, -1.0]]
-        )
-        # self.rotation = np.eye(3)
+        # self.rotation = np.array(
+        #     [[-1.0, 0.0, 0.0],
+        #      [0.0, 1.0, 0.0],
+        #      [0.0, 0.0, -1.0]]
+        # )
+        self.rotation = np.eye(3)
 
-        self.x, self.y, self.z = 0, 0, 0
-        self.roll, self.pitch, self.yaw = 0, 0, 0
+        self.last_ori = None
+        self.last_pos = None
         # 리셋 컨트롤
         self._control = np.zeros(6)
+
+        self.abs_offset = None
 
     def start_control(self):
         self._reset_internal_state()
@@ -141,6 +155,70 @@ class DynamixelMasterDevice(Device):
             else:
                 return 0
         
+    # 델타로 시도.
+    # def get_controller_state(self):
+    #     q = np.zeros(7)
+        
+    #     self.BulkRead.txRxPacket()
+    #     for i in range(7):
+    #         q[i] = self.BulkRead.getData(self.motor_ids[i], self.ADDR_PRESENT_POSITION, self.data_length_4byte)
+
+    #     dir = [1, 1, -1, 1, 1, 1]
+    #     offset = [0, -90, 0, -90, 0, 180]
+    #     # offset = [0, 0, 0, 0, 0, 0]
+    #     q_pose = []
+    #     for i in range(6):
+    #         q_pose.append((q[i] - 2048) * dir[i] * 360 / 4096 + offset[i])
+    #     q_pose_rad = np.deg2rad(q_pose)
+    #     self.current_q = q_pose_rad
+        
+    #     EE = self.forward_kinematics(q_pose_rad, self.d_ur5e, self.a_ur5e, self.alpha_ur5e)
+
+    #     self.pos = EE[:3, 3]
+    #     self.ori = EE[:3, :3]
+    #     print(f"master pos = {self.pos}")
+
+    #     if self.last_pos is None:
+    #         self.last_pos = np.array(self.pos)
+    #         self.last_ori = np.array(self.ori)
+    #         return dict(
+    #             dpos=np.zeros(3),
+    #             rotation=self.ori,
+    #             raw_drotation=np.zeros(3),
+    #             grasp=0,
+    #             reset=self._reset_state,
+    #             base_mode=int(self.base_mode),
+    #         )
+        
+    #     ori_obj = R.from_matrix(self.ori)
+    #     last_ori_obj = R.from_matrix(self.last_ori)
+    #     delta_r = ori_obj * last_ori_obj.inv()
+
+    #     dpos = (self.pos - self.last_pos)
+    #     drot = delta_r.as_rotvec()
+
+    #     # 전 pos와 ori 저장
+    #     self.last_pos = self.pos
+    #     self.last_ori = self.ori
+
+        
+
+    #     pre_swapped_drot = np.array([
+    #         drot[1],
+    #         drot[0],
+    #         -drot[2]
+    #     ])
+        
+    #     return dict(
+    #         dpos=dpos,
+    #         rotation=self.ori,
+    #         raw_drotation=pre_swapped_drot,
+    #         grasp=self.control_gripper(q[6]),
+    #         reset=self._reset_state,
+    #         base_mode=int(self.base_mode),
+    #     )
+    
+    # 절대로 시도
     def get_controller_state(self):
         q = np.zeros(7)
         
@@ -155,44 +233,40 @@ class DynamixelMasterDevice(Device):
         for i in range(6):
             q_pose.append((q[i] - 2048) * dir[i] * 360 / 4096 + offset[i])
         q_pose_rad = np.deg2rad(q_pose)
+        self.current_q = q_pose_rad
+        
         EE = self.forward_kinematics(q_pose_rad, self.d_ur5e, self.a_ur5e, self.alpha_ur5e)
 
         self.pos = EE[:3, 3]
-        self.rot = EE[:3, :3]
-        rot_mat = R.from_matrix(self.rot)
-        euler = rot_mat.as_euler('xyz')
+        self.ori = EE[:3, :3]
 
-        self.x = self.pos[0]
-        self.y = self.pos[1]
-        self.z = self.pos[2]
-        
-        self.roll = euler[0]
-        self.pitch = euler[1]
-        self.yaw = euler[2]
+        obs = self.env._get_observations()
 
-        self._control = [self.x, self.y, self.z, self.roll, self.pitch, self.yaw]      
+        base_pos = self.env.robots[0].base_pos
+        base_ori_mat = self.env.robots[0].base_ori
+        world_eef_pos = obs["robot0_eff_pos"]
 
-        dpos = self.control[:3] * 0.005 * self.pos_sensitivity
-        roll, pitch, yaw = self.control[3:] * 0.005 * self.rot_sensitivity
+        sim_eef_pos = base_ori_mat.T @ (world_eef_pos - base_pos)
 
-        drot1 = rotation_matrix(angle=-pitch, direction=[1, 0, 0], point=None)[:3, :3]
-        drot2 = rotation_matrix(angle=roll, direction=[0, 1, 0], point=None)[:3, :3]
-        drot3 = rotation_matrix(angle=yaw, direction=[0, 0, 1], point=None)[:3, :3]
+        self.abs_offset = sim_eef_pos - world_eef_pos
 
-        self.rotation = self.rotation.dot(drot1.dot(drot2.dot(drot3)))
-        
-        return dict(
-            dpos=dpos,
-            rotation=self.rotation,
-            raw_drotation=np.array([roll, pitch, yaw]),
-            grasp=self.control_gripper,
-            reset=self._reset_state,
-            base_mode=int(self.base_mode),
-        )
+        absolute_pos = self.abs_offset + self.pos
+
+        self.last_pos = self.pos
+        self.last_ori = self.ori
+
+        return {
+        "ee_pos": self.last_pos,               # 현재 위치
+        "ee_ori": self.last_ori,           # 현재 회전
+        "goal_pos": absolute_pos,         # 절대 제어 시 설정된 목표 위치
+        "goal_ori": self.ori,     # 절대 제어 시 설정된 목표 회전
+        "joint_pos": None, 
+    }
     
+
     def _postprocess_device_outputs(self, dpos, drotation):
         drotation = drotation * 50
-        dpos = dpos * 125
+        dpos = dpos * 20
 
         dpos = np.clip(dpos, -1, 1)
         drotation = np.clip(drotation, -1, 1)
@@ -200,8 +274,7 @@ class DynamixelMasterDevice(Device):
     
     # collect_human_demonstrations에서 초기 자세 잡으려고.
     def get_current_q(self):
-        dynamixel_q = self.q[:6]
-        return dynamixel_q
+        return self.current_q
     
     @property
     def control(self):

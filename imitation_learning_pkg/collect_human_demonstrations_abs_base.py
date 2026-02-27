@@ -336,6 +336,7 @@ if __name__ == "__main__":
     # controller_config["ik_input_ref_frame"] = "base"
     # 절대
     controller_config["input_type"] = "absolute"
+    controller_config["control_relative_to_world"] = "base"
 
     if controller_config["type"] == "WHOLE_BODY_MINK_IK":
         # mink-speicific import. requires installing mink
