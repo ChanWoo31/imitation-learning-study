@@ -94,7 +94,7 @@ def collect_human_trajectory(env, device, arm, max_fr, goal_update_mode):
 
         from copy import deepcopy
 
-        action_dict = deepcopy(input_ac_dict)  # {}
+        action_dict = deepcopy(input_ac_dict)  # {right_abs, right_delta, right_gripper, right}
         # set arm actions
         for arm in active_robot.arms:
             if isinstance(active_robot.composite_controller, WholeBody):  # input type passed to joint_action_policy
@@ -111,10 +111,16 @@ def collect_human_trajectory(env, device, arm, max_fr, goal_update_mode):
 
         # Maintain gripper state for each robot but only update the active robot with action
         env_action = [robot.create_action_vector(all_prev_gripper_actions[i]) for i, robot in enumerate(env.robots)]
+        print(f"env_action: {env_action}")
         env_action[device.active_robot] = active_robot.create_action_vector(action_dict)
+        print(f"active_robot : {env_action}")
         env_action = np.concatenate(env_action)
         for gripper_ac in all_prev_gripper_actions[device.active_robot]:
             all_prev_gripper_actions[device.active_robot][gripper_ac] = action_dict[gripper_ac]
+
+        # 프린트
+        # print(all_prev_gripper_actions)
+        print(action_dict)
 
         env.step(env_action)
         env.render()
@@ -381,8 +387,8 @@ if __name__ == "__main__":
 
     # initialize device
     if args.device == "dynamixel":
-        from dynamixel_master_device import DynamixelMasterDevice
-        device = DynamixelMasterDevice(
+        from dynamixel_master_device_delta import DynamixelMasterDeviceDelta
+        device = DynamixelMasterDeviceDelta(
             env=env,
             pos_sensitivity=args.pos_sensitivity,
             rot_sensitivity=args.rot_sensitivity,

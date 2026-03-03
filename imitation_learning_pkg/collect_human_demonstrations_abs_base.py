@@ -14,6 +14,8 @@ from glob import glob
 import h5py
 import numpy as np
 
+from scipy.spatial.transform import Rotation as R
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
 src_path = os.path.abspath(os.path.join(current_dir, "..", "..", ".."))
 robosuite_repo_path = os.path.join(src_path, "robosuite")
@@ -43,23 +45,6 @@ def collect_human_trajectory(env, device, arm, max_fr, goal_update_mode):
 
     env.reset()
 
-    # 초기 조인트 값 설정
-    device.get_controller_state()
-    init_joint = device.get_current_q()
-
-    # print("-" * 50)
-    # print(f"Master Joint Angles (deg): {np.rad2deg(init_joint[:6])}")
-
-    env.robots[0].set_robot_joint_positions(init_joint)
-    env.sim.forward()
-
-    sim_joints = env.robots[0]._joint_positions
-    # print(f"Sim Robot Joint Angles (deg): {np.rad2deg(sim_joints)}")
-    # print("-" * 50)
-
-    policy = env.robots[0].composite_controller
-    policy.reset()
-
     task_completion_hold_count = -1  # counter to collect 10 timesteps after reaching goal
     device.start_control()
 
@@ -82,51 +67,77 @@ def collect_human_trajectory(env, device, arm, max_fr, goal_update_mode):
     while True:
         start = time.time()
 
-        # Set active robot
+        # # Set active robot
         active_robot = env.robots[device.active_robot]
 
-        # Get the newest action
-        input_ac_dict = device.input2action(goal_update_mode=goal_update_mode)
+        # # Get the newest action
+        # input_ac_dict = device.input2action(goal_update_mode=goal_update_mode)
 
-        # If action is none, then this a reset so we should break
-        if input_ac_dict is None:
-            break
+        # # If action is none, then this a reset so we should break
+        # if input_ac_dict is None:
+        #     break
 
-        from copy import deepcopy
+        # from copy import deepcopy
 
-        action_dict = deepcopy(input_ac_dict)  # {}
-        # set arm actions
-        for arm in active_robot.arms:
-            if isinstance(active_robot.composite_controller, WholeBody):  # input type passed to joint_action_policy
-                controller_input_type = active_robot.composite_controller.joint_action_policy.input_type
-            else:
-                controller_input_type = active_robot.part_controllers[arm].input_type
+        # action_dict = deepcopy(input_ac_dict)  # {}
+        # # set arm actions
+        # for arm in active_robot.arms:
+        #     if isinstance(active_robot.composite_controller, WholeBody):  # input type passed to joint_action_policy
+        #         controller_input_type = active_robot.composite_controller.joint_action_policy.input_type
+        #     else:
+        #         controller_input_type = active_robot.part_controllers[arm].input_type
 
-            if controller_input_type == "delta":
-                action_dict[arm] = input_ac_dict[f"{arm}_delta"]
-            elif controller_input_type == "absolute":
-                action_dict[arm] = input_ac_dict[f"{arm}_abs"]
-            else:
-                raise ValueError
+        #     if controller_input_type == "delta":
+        #         action_dict[arm] = input_ac_dict[f"{arm}_delta"]
+        #     elif controller_input_type == "absolute":
+        #         action_dict[arm] = input_ac_dict[f"{arm}_abs"]
+        #     else:
+        #         raise ValueError
 
-        # Maintain gripper state for each robot but only update the active robot with action
+        # # Maintain gripper state for each robot but only update the active robot with action
+        # env_action = [robot.create_action_vector(all_prev_gripper_actions[i]) for i, robot in enumerate(env.robots)]
+        # env_action[device.active_robot] = active_robot.create_action_vector(action_dict)
+        # env_action = np.concatenate(env_action)
+        # for gripper_ac in all_prev_gripper_actions[device.active_robot]:
+        #     all_prev_gripper_actions[device.active_robot][gripper_ac] = action_dict[gripper_ac]
+
+        state = device.get_controller_state()
+
+        arm_name = env.robots[0].arms[0]
+        test_pos = np.array([0.4, 0, 0.4])
+        fixed_ori = np.array([0.0, 0.0, 0.0])
+
         env_action = [robot.create_action_vector(all_prev_gripper_actions[i]) for i, robot in enumerate(env.robots)]
+        action_dict = {
+            arm_name: np.concatenate([state["pos"], state["ori"]]),
+            f"{arm_name}_gripper": state["gripper"]
+        }
+        # print(action_dict)
+
         env_action[device.active_robot] = active_robot.create_action_vector(action_dict)
         env_action = np.concatenate(env_action)
+
+        # env_action = env.robots[0].create_action_vector(action_dict)
+
         for gripper_ac in all_prev_gripper_actions[device.active_robot]:
             all_prev_gripper_actions[device.active_robot][gripper_ac] = action_dict[gripper_ac]
 
-        env.step(env_action)
+        obs, reward, done, info = env.step(env_action)
+
+        # 타겟과 현재 값 확인.
+        curr_pos_from_world = obs['robot0_eef_pos']
+        ori = R.from_quat(obs['robot0_eef_quat']).as_rotvec()
+        base_pos = env.robots[0].base_pos
+        curr_pos_from_base = curr_pos_from_world - base_pos
+
+        print(f"target_pos : {env_action[:3]}")
+        print(f"target_ori : {env_action[3:6]}")
+        print(f"current_pos: {curr_pos_from_base}")
+        print(f"current_ori: {ori}")
+
+        # env.step(env_action)
         env.render()
 
-        # 엔드이펙터 좌표
-        obs, reward, done, info = env.step(env_action)
-        eef_pos = obs['robot0_eef_pos']
-        # print(f"sim pos ={eef_pos}")
-
-        # base_pos = env.robots[0].base_pos
-        # relative_eff_pos = eef_pos - base_pos
-        # print(f"sim pos(rel) = {relative_eff_pos}")
         
 
         # Also break if we complete the task
@@ -278,10 +289,11 @@ if __name__ == "__main__":
         default="frontview",
         help="List of camera names to use for collecting demos. Pass multiple names to enable multiple views. Note: the `mujoco` renderer must be enabled when using multiple views; `mjviewer` is not supported.",
     )
+    # 컨트롤러 디폴트 BASIC으로 수정.
     parser.add_argument(
         "--controller",
         type=str,
-        default=None,
+        default="BASIC",
         help="Choice of controller. Can be generic (eg. 'BASIC' or 'WHOLE_BODY_MINK_IK') or json file (see robosuite/controllers/config for examples)",
     )
     parser.add_argument("--device", type=str, default="dynamixel")
@@ -331,12 +343,11 @@ if __name__ == "__main__":
         controller=args.controller,
         robot=args.robots[0],
     )
+    # print(controller_config["body_parts"].keys())
 
-    # # 베이스 기준으로 하도록 추가
-    # controller_config["ik_input_ref_frame"] = "base"
-    # 절대
-    controller_config["input_type"] = "absolute"
-    controller_config["control_relative_to_world"] = "base"
+    # 수정
+    controller_config["body_parts"]["right"]["type"] = "OSC_POSE"
+    controller_config["body_parts"]["right"]["input_type"] = "absolute"
 
     if controller_config["type"] == "WHOLE_BODY_MINK_IK":
         # mink-speicific import. requires installing mink
@@ -345,6 +356,8 @@ if __name__ == "__main__":
     # if WHOLE BODY IK; assert only one robot
     if controller_config["type"] == "WHOLE_BODY_IK":
         assert len(args.robots) == 1, "Whole Body IK only supports one robot"
+
+    
 
     # Create argument configuration
     config = {
@@ -356,6 +369,8 @@ if __name__ == "__main__":
     # Check if we're using a multi-armed environment and use env_configuration argument if so
     if "TwoArm" in args.environment:
         config["env_configuration"] = args.config
+
+    
 
     # Create environment
     env = suite.make(

@@ -22,7 +22,7 @@ def deg2rad(x):
     y = x * np.pi / 180
     return y
 
-class DynamixelMasterDevice(Device):
+class DynamixelMasterDeviceDelta(Device):
     def __init__(self, env, pos_sensitivity=1.0, rot_sensitivity=1.0):
         
         super().__init__(env)
@@ -155,8 +155,7 @@ class DynamixelMasterDevice(Device):
             else:
                 return 0
         
-
-    # 절대로 시도
+    # 델타로 시도.
     def get_controller_state(self):
         q = np.zeros(7)
         
@@ -177,30 +176,47 @@ class DynamixelMasterDevice(Device):
 
         self.pos = EE[:3, 3]
         self.ori = EE[:3, :3]
+        print(f"master pos = {self.pos}")
 
+        if self.last_pos is None:
+            self.last_pos = np.array(self.pos)
+            self.last_ori = np.array(self.ori)
+            return dict(
+                dpos=np.zeros(3),
+                rotation=self.ori,
+                raw_drotation=np.zeros(3),
+                grasp=0,
+                reset=self._reset_state,
+                base_mode=int(self.base_mode),
+            )
+        
         ori_obj = R.from_matrix(self.ori)
-        ori = ori_obj.as_rotvec()
+        last_ori_obj = R.from_matrix(self.last_ori)
+        delta_r = ori_obj * last_ori_obj.inv()
 
-        # obs = self.env._get_observations()
+        dpos = (self.pos - self.last_pos)
+        drot = delta_r.as_rotvec()
 
-        # base_pos = self.env.robots[0].base_pos
-        # base_ori_mat = self.env.robots[0].base_ori
-        # world_eef_pos = obs["robot0_eff_pos"]
-
-        # sim_eef_pos = base_ori_mat.T @ (world_eef_pos - base_pos)
-
-        # self.abs_offset = sim_eef_pos - world_eef_pos
-
-        # absolute_pos = self.abs_offset + self.pos
-
+        # 전 pos와 ori 저장
         self.last_pos = self.pos
         self.last_ori = self.ori
 
-        return {
-        "pos": self.pos,
-        "ori": ori,
-        "gripper": [self.control_gripper(q[6])]
-    }
+        
+
+        pre_swapped_drot = np.array([
+            drot[1],
+            drot[0],
+            -drot[2]
+        ])
+        
+        return dict(
+            dpos=dpos,
+            rotation=self.ori,
+            raw_drotation=pre_swapped_drot,
+            grasp=self.control_gripper(q[6]),
+            reset=self._reset_state,
+            base_mode=int(self.base_mode),
+        )
     
 
     def _postprocess_device_outputs(self, dpos, drotation):
