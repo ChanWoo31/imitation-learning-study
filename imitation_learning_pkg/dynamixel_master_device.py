@@ -147,13 +147,13 @@ class DynamixelMasterDevice(Device):
         if value > max_val:
             return 1
         elif value < min_val:
-            return 0
+            return -1
         else:
             normalized_val = (value - min_val) / (max_val - min_val)
             if normalized_val > 0.5:
                 return 1
             else:
-                return 0
+                return -1
         
 
     # 절대로 시도
@@ -165,7 +165,7 @@ class DynamixelMasterDevice(Device):
             q[i] = self.BulkRead.getData(self.motor_ids[i], self.ADDR_PRESENT_POSITION, self.data_length_4byte)
 
         dir = [1, 1, -1, 1, 1, 1]
-        offset = [0, -90, 0, -90, 0, 180]
+        offset = [0, -90, 0, -90, 0, 0]
         # offset = [0, 0, 0, 0, 0, 0]
         q_pose = []
         for i in range(6):
@@ -181,25 +181,13 @@ class DynamixelMasterDevice(Device):
         ori_obj = R.from_matrix(self.ori)
         ori = ori_obj.as_rotvec()
 
-        # obs = self.env._get_observations()
-
-        # base_pos = self.env.robots[0].base_pos
-        # base_ori_mat = self.env.robots[0].base_ori
-        # world_eef_pos = obs["robot0_eff_pos"]
-
-        # sim_eef_pos = base_ori_mat.T @ (world_eef_pos - base_pos)
-
-        # self.abs_offset = sim_eef_pos - world_eef_pos
-
-        # absolute_pos = self.abs_offset + self.pos
-
         self.last_pos = self.pos
         self.last_ori = self.ori
 
         return {
         "pos": self.pos,
         "ori": ori,
-        "gripper": [self.control_gripper(q[6])]
+        "gripper": np.array([self.control_gripper(q[6])])
     }
     
 

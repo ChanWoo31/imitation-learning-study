@@ -112,7 +112,6 @@ def collect_human_trajectory(env, device, arm, max_fr, goal_update_mode):
             arm_name: np.concatenate([state["pos"], state["ori"]]),
             f"{arm_name}_gripper": state["gripper"]
         }
-        # print(action_dict)
 
         env_action[device.active_robot] = active_robot.create_action_vector(action_dict)
         env_action = np.concatenate(env_action)
@@ -130,10 +129,10 @@ def collect_human_trajectory(env, device, arm, max_fr, goal_update_mode):
         base_pos = env.robots[0].base_pos
         curr_pos_from_base = curr_pos_from_world - base_pos
 
-        print(f"target_pos : {env_action[:3]}")
-        print(f"target_ori : {env_action[3:6]}")
-        print(f"current_pos: {curr_pos_from_base}")
-        print(f"current_ori: {ori}")
+        # print(f"target_pos : {env_action[:3]}")
+        # print(f"target_ori : {env_action[3:6]}")
+        # print(f"current_pos: {curr_pos_from_base}")
+        # print(f"current_ori: {ori}")
 
         # env.step(env_action)
         env.render()
@@ -262,7 +261,12 @@ if __name__ == "__main__":
         type=str,
         default=os.path.join(suite.models.assets_root, "demonstrations_private"),
     )
-    parser.add_argument("--environment", type=str, default="Lift")
+    parser.add_argument(
+        "--environment", 
+        type=str, 
+        default="PickPlace",
+        help="Lift, PickPlace"
+    )
     parser.add_argument(
         "--robots",
         nargs="+",
