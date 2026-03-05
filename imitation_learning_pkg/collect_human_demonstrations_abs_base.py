@@ -67,6 +67,14 @@ def collect_human_trajectory(env, device, arm, max_fr, goal_update_mode):
     while True:
         start = time.time()
 
+        # 초기화
+        if hasattr(device, 'reset_flag') and device.reset_flag:
+            env.reset()
+            device.reset_flag = False
+            device._reset_internal_state()
+
+            continue
+
         # # Set active robot
         active_robot = env.robots[device.active_robot]
 
@@ -264,7 +272,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--environment", 
         type=str, 
-        default="PickPlace",
+        default="PickPlaceCan",
         help="Lift, PickPlace"
     )
     parser.add_argument(
@@ -290,8 +298,8 @@ if __name__ == "__main__":
         "--camera",
         nargs="*",
         type=str,
-        default="frontview",
-        help="List of camera names to use for collecting demos. Pass multiple names to enable multiple views. Note: the `mujoco` renderer must be enabled when using multiple views; `mjviewer` is not supported.",
+        default="agentview",
+        help="(ex: frontview, agentview)List of camera names to use for collecting demos. Pass multiple names to enable multiple views. Note: the `mujoco` renderer must be enabled when using multiple views; `mjviewer` is not supported.",
     )
     # 컨트롤러 디폴트 BASIC으로 수정.
     parser.add_argument(

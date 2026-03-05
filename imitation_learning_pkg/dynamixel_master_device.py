@@ -5,6 +5,8 @@ from dynamixel_sdk import *
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
+from pynput.keyboard import Key, Listener
+
 
 
 
@@ -84,23 +86,26 @@ class DynamixelMasterDevice(Device):
         # 6-DOF variables
         self.dynamixel_angle = np.zeros(6)
 
-        self.x, self.y, self.z = 0, 0, 0
-        self.roll, self.pitch, self.yaw = 0, 0, 0
-
         self._control = [0, 0, 0, 0, 0, 0]
         self._reset_state = 0
         # self.rotation = np.array([[-1, 0, 0],
         #                           [0, 1, 0],
         #                           [0, 0, -1]])
         self.rotation = np.eye(3)
-        self.last_pos = None
-        self.last_ori = None
+        self.pos = None
+        self.ori = None
 
         self.q = np.zeros(6)
         self.current_q = np.zeros(6)
 
         # 절대로 시도
         self.abs_offset = None
+
+        # 초기화 키
+        self.listener = Listener(on_release=self.on_release)
+        self.listener.start()
+
+        self.reset_flag = False
         
     def trans_mat(self, theta, d, a, alpha):
         T = np.array([
@@ -128,12 +133,23 @@ class DynamixelMasterDevice(Device):
         # )
         self.rotation = np.eye(3)
 
-        self.last_ori = None
-        self.last_pos = None
+        self.ori = None
+        self.pos = None
         # 리셋 컨트롤
         self._control = np.zeros(6)
 
         self.abs_offset = None
+
+    def on_release(self, key):
+        try:
+            if key == Key.space:
+                if self.env is not None:
+                    self.reset_flag = True
+                self._reset_state = 1
+                self._enabled = False
+                self._reset_internal_state()
+        except AttributeError as e:
+            pass
 
     def start_control(self):
         self._reset_internal_state()
