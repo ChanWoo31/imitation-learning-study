@@ -63,6 +63,20 @@ def collect_human_trajectory(env, device, arm, max_fr, goal_update_mode):
         for robot in env.robots
     ]
 
+    # 처음에 내 마스터 위치로 오도록 세팅 이때는 기록 안 되도록.
+    active_robot = env.robots[device.active_robot]
+    arm_name = active_robot.arms[0]
+    for _ in range(100):
+        state = device.get_controller_state()
+        action_dict = {
+            arm_name: np.concatenate([state["pos"], state["ori"]]),
+            f"{arm_name}_gripper": state["gripper"]
+        }
+        env_action = active_robot.create_action_vector(action_dict)
+        env.step(env_action)
+        env.render()
+    print("초기 위치 동기화~")
+
     # Loop until we get a reset from the input or the task completes
     while True:
         start = time.time()
@@ -77,37 +91,6 @@ def collect_human_trajectory(env, device, arm, max_fr, goal_update_mode):
 
         # # Set active robot
         active_robot = env.robots[device.active_robot]
-
-        # # Get the newest action
-        # input_ac_dict = device.input2action(goal_update_mode=goal_update_mode)
-
-        # # If action is none, then this a reset so we should break
-        # if input_ac_dict is None:
-        #     break
-
-        # from copy import deepcopy
-
-        # action_dict = deepcopy(input_ac_dict)  # {}
-        # # set arm actions
-        # for arm in active_robot.arms:
-        #     if isinstance(active_robot.composite_controller, WholeBody):  # input type passed to joint_action_policy
-        #         controller_input_type = active_robot.composite_controller.joint_action_policy.input_type
-        #     else:
-        #         controller_input_type = active_robot.part_controllers[arm].input_type
-
-        #     if controller_input_type == "delta":
-        #         action_dict[arm] = input_ac_dict[f"{arm}_delta"]
-        #     elif controller_input_type == "absolute":
-        #         action_dict[arm] = input_ac_dict[f"{arm}_abs"]
-        #     else:
-        #         raise ValueError
-
-        # # Maintain gripper state for each robot but only update the active robot with action
-        # env_action = [robot.create_action_vector(all_prev_gripper_actions[i]) for i, robot in enumerate(env.robots)]
-        # env_action[device.active_robot] = active_robot.create_action_vector(action_dict)
-        # env_action = np.concatenate(env_action)
-        # for gripper_ac in all_prev_gripper_actions[device.active_robot]:
-        #     all_prev_gripper_actions[device.active_robot][gripper_ac] = action_dict[gripper_ac]
 
         state = device.get_controller_state()
 
@@ -273,7 +256,7 @@ if __name__ == "__main__":
         "--environment", 
         type=str, 
         default="PickPlaceCan",
-        help="Lift, PickPlace"
+        help="Lift, PickPlace, PickPlaceCan"
     )
     parser.add_argument(
         "--robots",
