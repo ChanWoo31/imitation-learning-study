@@ -66,7 +66,7 @@ def collect_human_trajectory(env, device, arm, max_fr, goal_update_mode):
     # 처음에 내 마스터 위치로 오도록 세팅 이때는 기록 안 되도록.
     active_robot = env.robots[device.active_robot]
     arm_name = active_robot.arms[0]
-    for _ in range(100):
+    for _ in range(150):
         state = device.get_controller_state()
         action_dict = {
             arm_name: np.concatenate([state["pos"], state["ori"]]),
@@ -340,7 +340,7 @@ if __name__ == "__main__":
     )
     # print(controller_config["body_parts"].keys())
 
-    # 수정
+    # 수정함 OSC_POSE와 absolute로.
     controller_config["body_parts"]["right"]["type"] = "OSC_POSE"
     controller_config["body_parts"]["right"]["input_type"] = "absolute"
 
