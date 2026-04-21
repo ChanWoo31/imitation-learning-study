@@ -25,11 +25,11 @@ if robosuite_repo_path not in sys.path:
 
 import robosuite as suite
 
-import pick_place_pyramid
-
 from robosuite.controllers import load_composite_controller_config
 from robosuite.controllers.composite.composite_controller import WholeBody
 from robosuite.wrappers import DataCollectionWrapper, VisualizationWrapper
+
+from robosuite.utils.binding_utils import MjSim
 
 
 def collect_human_trajectory(env, device, arm, max_fr, goal_update_mode):
@@ -257,7 +257,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--environment", 
         type=str, 
-        default="PickPlacePyramid",
+        default="PickPlaceCan",
         help="Lift, PickPlace, PickPlaceCan"
     )
     parser.add_argument(
