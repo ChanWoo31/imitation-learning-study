@@ -25,7 +25,7 @@ if robosuite_repo_path not in sys.path:
 
 import robosuite as suite
 
-import pick_place_pyramid
+import stack_pyramid
 
 from robosuite.controllers import load_composite_controller_config
 from robosuite.controllers.composite.composite_controller import WholeBody
@@ -68,7 +68,7 @@ def collect_human_trajectory(env, device, arm, max_fr, goal_update_mode):
     # 처음에 내 마스터 위치로 오도록 세팅 이때는 기록 안 되도록.
     active_robot = env.robots[device.active_robot]
     arm_name = active_robot.arms[0]
-    for _ in range(150):
+    for _ in range(80):
         state = device.get_controller_state()
         action_dict = {
             arm_name: np.concatenate([state["pos"], state["ori"]]),
@@ -85,20 +85,26 @@ def collect_human_trajectory(env, device, arm, max_fr, goal_update_mode):
 
         # 초기화
         if hasattr(device, 'reset_flag') and device.reset_flag:
+
+            initial_q = device.get_current_q()
+
             env.reset()
+
+            env.robots[0].set_robot_joint_positions(initial_q)
+            env.sim.forward()
+            device.start_control()
+
             device.reset_flag = False
             device._reset_internal_state()
 
             continue
 
-        # # Set active robot
+        # Set active robot
         active_robot = env.robots[device.active_robot]
 
         state = device.get_controller_state()
 
         arm_name = env.robots[0].arms[0]
-        test_pos = np.array([0.4, 0, 0.4])
-        fixed_ori = np.array([0.0, 0.0, 0.0])
 
         env_action = [robot.create_action_vector(all_prev_gripper_actions[i]) for i, robot in enumerate(env.robots)]
         action_dict = {
@@ -117,10 +123,10 @@ def collect_human_trajectory(env, device, arm, max_fr, goal_update_mode):
         obs, reward, done, info = env.step(env_action)
 
         # 타겟과 현재 값 확인.
-        curr_pos_from_world = obs['robot0_eef_pos']
-        ori = R.from_quat(obs['robot0_eef_quat']).as_rotvec()
-        base_pos = env.robots[0].base_pos
-        curr_pos_from_base = curr_pos_from_world - base_pos
+        # curr_pos_from_world = obs['robot0_eef_pos']
+        # ori = R.from_quat(obs['robot0_eef_quat']).as_rotvec()
+        # base_pos = env.robots[0].base_pos
+        # curr_pos_from_base = curr_pos_from_world - base_pos
 
         # print(f"target_pos : {env_action[:3]}")
         # print(f"target_ori : {env_action[3:6]}")
@@ -244,6 +250,7 @@ def gather_demonstrations_as_hdf5(directory, out_dir, env_info):
     grp.attrs["env_info"] = env_info
 
     f.close()
+    print(f"-----------성공 에피소드 갯수: {num_eps}---------")
 
 
 if __name__ == "__main__":
@@ -257,7 +264,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--environment", 
         type=str, 
-        default="PickPlacePyramid",
+        default="StackPyramid",
         help="Lift, PickPlace, PickPlaceCan"
     )
     parser.add_argument(

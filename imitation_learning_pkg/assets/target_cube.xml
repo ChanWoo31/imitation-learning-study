@@ -1,0 +1,10 @@
+<mujoco model="target_cube">
+    <worldbody>
+
+        <site name="target_B_body" pos="0.00 0.145 0.825" type="box" size="0.025 0.025 0.025" rgba="0 1 0 0.1" group="1"/>
+
+        <site name="target_C_body" pos="0.00 0.095 0.825" type="box" size="0.025 0.025 0.025" rgba="0 0 1 0.1" group="1"/>
+
+        <site name="target_A_body" pos="0.00 0.12 0.87" type="box" size="0.02 0.02 0.02" rgba="1 0 0 0.1" group="1"/>
+    </worldbody>
+</mujoco>

@@ -73,15 +73,16 @@ class DynamixelMasterDevice(Device):
             print("보드레이트 실패")
             exit()
 
-        self.BulkRead = GroupBulkRead(self.portHandler, self.packetHandler)
-        self.BulkWrite = GroupBulkWrite(self.portHandler, self.packetHandler)
+        # self.BulkRead = GroupBulkRead(self.portHandler, self.packetHandler)
+        # self.BulkWrite = GroupBulkWrite(self.portHandler, self.packetHandler)
+        self.GroupSyncRead = GroupSyncRead(self.portHandler, self.packetHandler, self.ADDR_PRESENT_POSITION, 4)
 
         for id in self.motor_ids:
             self.packetHandler.write1ByteTxRx(self.portHandler, id, self.ADDR_TORQUE_ENABLE, 0)
 
         self.data_length_4byte = 4
         for i in range(7):
-            self.BulkRead.addParam(self.motor_ids[i], self.ADDR_PRESENT_POSITION, self.data_length_4byte)
+            self.GroupSyncRead.addParam(self.motor_ids[i])
 
         # 6-DOF variables
         self.dynamixel_angle = np.zeros(6)
@@ -139,6 +140,9 @@ class DynamixelMasterDevice(Device):
         self._control = np.zeros(6)
 
         self.abs_offset = None
+        
+        self.init_q = self.get_current_q()
+        # self.env.robots[0].set_robot_joint_positions(self.init_q)
 
     def on_release(self, key):
         try:
@@ -176,9 +180,10 @@ class DynamixelMasterDevice(Device):
     def get_controller_state(self):
         q = np.zeros(7)
         
-        self.BulkRead.txRxPacket()
+        # self.BulkRead.txRxPacket()
+        self.GroupSyncRead.txRxPacket()
         for i in range(7):
-            q[i] = self.BulkRead.getData(self.motor_ids[i], self.ADDR_PRESENT_POSITION, self.data_length_4byte)
+            q[i] = self.GroupSyncRead.getData(self.motor_ids[i], self.ADDR_PRESENT_POSITION, self.data_length_4byte)
 
         dir = [1, 1, -1, 1, 1, 1]
         offset = [0, -90, 0, -90, 0, 0]
@@ -217,7 +222,19 @@ class DynamixelMasterDevice(Device):
     
     # collect_human_demonstrations에서 초기 자세 잡으려고.
     def get_current_q(self):
-        return self.current_q
+        q = np.zeros(6)
+        for i in range(6):
+            q[i] = self.GroupSyncRead.getData(self.motor_ids[i], self.ADDR_PRESENT_POSITION, self.data_length_4byte)
+
+        offset = [0, -90, 0, -90, 0, 0]
+        dir = [1, 1, -1, 1, 1, 1]
+        q_pose = []
+        for i in range(6):
+            q_pose.append((q[i] - 2048) * dir[i] * 360 / 4096 + offset[i])
+        q_pose_rad = np.deg2rad(q_pose)
+
+        self.init_q = q_pose_rad
+        return self.init_q
     
     @property
     def control(self):

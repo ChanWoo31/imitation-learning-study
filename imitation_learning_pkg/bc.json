@@ -14,8 +14,8 @@
             "every_n_seconds": null,
             "every_n_epochs": 50,
             "epochs": [],
-            "on_best_validation": true,
-            "on_best_rollout_return": false,
+            "on_best_validation": false,
+            "on_best_rollout_return": true,
             "on_best_rollout_success_rate": true
         },
         "epoch_every_n_steps": 100,
@@ -30,7 +30,7 @@
             "enabled": true,
             "n": 50,
             "horizon": 400,
-            "rate": 50,
+            "rate": 100,
             "warmstart": 0,
             "terminate_on_success": true
         },
@@ -83,7 +83,7 @@
                     "scheduler_type": "multistep"
                 },
                 "regularization": {
-                    "L2": 1e-5
+                    "L2": 1e-3
                 }
             }
         },

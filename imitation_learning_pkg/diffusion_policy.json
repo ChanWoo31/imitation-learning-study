@@ -19,11 +19,11 @@
             "on_best_rollout_success_rate": true
         },
         "epoch_every_n_steps": 100,
-        "validation_epoch_every_n_steps": 1,
+        "validation_epoch_every_n_steps": 10,
         "env": null,
         "additional_envs": null,
         "render": false,
-        "render_video": true,
+        "render_video": false,
         "keep_all_videos": false,
         "video_skip": 5,
         "rollout": {
@@ -45,10 +45,10 @@
         "hdf5_cache_mode": "all",
         "hdf5_use_swmr": true,
         "hdf5_load_next_obs": false,
-        "hdf5_normalize_obs": false,
+        "hdf5_normalize_obs": true,
         "hdf5_filter_key": "train",
         "hdf5_validation_filter_key": "valid",
-        "seq_length": 16,
+        "seq_length": 32,
         "pad_seq_length": true,
         "frame_stack": 2,
         "pad_frame_stack": true,
@@ -67,8 +67,8 @@
         },
         "goal_mode": null,
         "cuda": true,
-        "batch_size": 100,
-        "num_epochs": 2000,
+        "batch_size": 64,
+        "num_epochs": 3000,
         "seed": 1,
         "max_grad_norm": null
     },
@@ -92,8 +92,8 @@
         },
         "horizon": {
             "observation_horizon": 2,
-            "action_horizon": 8,
-            "prediction_horizon": 16
+            "action_horizon": 16,
+            "prediction_horizon": 32
         },
         "unet": {
             "enabled": true,
@@ -108,7 +108,7 @@
         },
         "ema": {
             "enabled": true,
-            "power": 0.75
+            "power": 0.9999
         },
         "ddpm": {
             "enabled": true,
@@ -136,7 +136,6 @@
                     "robot0_eef_pos",
                     "robot0_eef_quat",
                     "robot0_gripper_qpos",
-                    "robot0_joint_pos",
                     "object"
                 ],
                 "rgb": [],
@@ -154,10 +153,8 @@
             "low_dim": {
                 "core_class": null,
                 "core_kwargs": {},
-                "obs_randomizer_class": "GaussianNoiseRandomizer",
-                "obs_randomizer_kwargs": {
-                    "noise_std": 0.05
-                }
+                "obs_randomizer_class": null,
+                "obs_randomizer_kwargs": {}
             },
             "rgb": {
                 "core_class": "VisualCore",
